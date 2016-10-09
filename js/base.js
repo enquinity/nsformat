@@ -25,11 +25,11 @@ NsBaseFormatter.prototype.tokenize = function(text) {
         cursor = i2 + 1;
     }
     return tokens;
-}
+};
 
 NsBaseFormatter.prototype.formatValue = function(val, formatter, precision, formattervals) {
     return val;
-}
+};
 
 NsBaseFormatter.prototype.parseIndex = function(index, result) {
     if (!index || index == '') {
@@ -52,13 +52,13 @@ NsBaseFormatter.prototype.parseIndex = function(index, result) {
         return;
     }
     retult.value = index;
-}
+};
 
 NsBaseFormatter.prototype.format = function(text) {
     var params = Array.prototype.slice.call(arguments);
     params.shift();
     return this.formatArr(text, params);
-}
+};
 
 NsBaseFormatter.prototype.formatArr = function(text, vals) {
     var padStr = function(pad, str, padLeft) {
@@ -100,7 +100,7 @@ NsBaseFormatter.prototype.formatArr = function(text, vals) {
                 }
                 if (tt.length > ci) {
                     format = tt[ci];
-                    fmtMatch = format.match(/([-+*].\d+|[-+*]?\d+)?(-\d+)?(\.\d+)?(\w+)\s*(.*)/)
+                    fmtMatch = format.match(/([-+*].\d+|[-+*]?\d+)?(-\d+)?(\.\d+)?(\w+)\s*(.*)/);
                     if (!fmtMatch) {
                         throw "Bad format " + format;
                     }
@@ -168,8 +168,7 @@ NsBaseFormatter.prototype.formatArr = function(text, vals) {
 
                 fmt += fval;
                 break;
-
         }
     }
     return fmt;
-}
+};
