@@ -1,4 +1,7 @@
 <?php
+/*
+ * NS Format version 1.1.0
+ */
 namespace Nsformat;
 
 class CompiledTag {
@@ -25,13 +28,14 @@ class CompiledFormat {
 }
 
 class BaseFormatter {
-    protected $rex = '/(?<!\{)\{(?!\{)(.+?)(?::~(.+?))?(?::(-?\d+)?(?:.(\d+))?([^\s}]+)(?:\s+(.+?))?)?(?<!\})\}(?!\})/';
+    protected $rex = '/(?<!\{)\{(?!\{)(.+?)(?::~(.+?))?(?::([-+*]?\d+|[-+*]\D\d+)?(?:-(\d+))?(?:.(\d+))?([^\s}]+)(?:\s+(.+?))?)?(?<!\})\}(?!\})/';
     protected $rexIdx = 1;
     protected $rexEmptyVal = 2;
     protected $rexWidth = 3;
-    protected $rexPrecision = 4;
-    protected $rexFormat = 5;
-    protected $rexFormatArgs = 6;
+    protected $rexMaxWidth = 4;
+    protected $rexPrecision = 5;
+    protected $rexFormat = 6;
+    protected $rexFormatArgs = 7;
 
     public function format($format/*, $args...*/) {
         $args = func_get_args();
@@ -80,11 +84,30 @@ class BaseFormatter {
                 }
                 $value = $this->formatValue($value, $formatter, $precision, $formatArgs);
             }
-            if (isset($m[$this->rexWidth]) && $m[$this->rexWidth] != '') {
-                if ('-' === $m[$this->rexWidth][0]) {
-                    $value = str_pad($value, substr($m[$this->rexWidth], 1), ' ', STR_PAD_RIGHT);
-                } else {
-                    $value = str_pad($value, $m[$this->rexWidth], ' ', STR_PAD_LEFT);
+            if (isset($m[$this->rexWidth]) && $m[$this->rexWidth] != '' && $m[$this->rexWidth] !== '0') {
+                $padChar = ' ';
+                $padAlign = STR_PAD_LEFT;
+                $padWidth = $m[$this->rexWidth];
+                
+                if ('-' === $padWidth[0] || '+' === $padWidth[0] || '*' === $padWidth[0]) {
+                    $padAlign = ('-' === $padWidth[0]) ? STR_PAD_RIGHT : ('+' === $padWidth[0] ? STR_PAD_LEFT : STR_PAD_BOTH);
+                    if (isset($padWidth[2]) && ($padWidth[1] <= '0' || $padWidth[1] > '9')) {
+                        $padChar = $padWidth[1];
+                        $padWidth = substr($padWidth, 2);
+                    } else {
+                        $padWidth = substr($padWidth, 1);
+                    }
+                } elseif ('0' === $padWidth[0] && isset($padWidth[1])) {
+                    $padChar = '0';
+                    $padWidth = substr($padWidth, 1);
+                }
+                if ($padWidth > 0) {
+                    $value = str_pad($value, $padWidth, $padChar, $padAlign);
+                }
+            }
+            if (isset($m[$this->rexMaxWidth]) && $m[$this->rexMaxWidth] != '') {
+                if (strlen($value) > $m[$this->rexMaxWidth]) {
+                    $value = substr($value, 0, $m[$this->rexMaxWidth]);
                 }
             }
             return $value;
