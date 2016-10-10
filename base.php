@@ -1,46 +1,14 @@
 <?php
-/*
- * NS Format version 1.1.0
- */
 namespace Nsformat;
 
-class CompiledTag {
-    public $argIndex;
-    public $argSubIndex;
-    public $width;
-    public $precision;
-    public $format;
-    public $formatArgs;
-    public $emptyValue;
-}
+require_once __DIR__ . '/abstract.php';
 
-class CompiledFormat {
-    /**
-     * Skompilowany string zgodny z formatem sprintf.
-     * @var string
-     */
-    public $string;
-
-    /**
-     * @var CompiledTag[]
-     */
-    public $tags = [];
-}
-
-class BaseFormatter {
-    protected $rex = '/(?<!\{)\{(?!\{)(.+?)(?::~(.+?))?(?::([-+*]?\d+|[-+*]\D\d+)?(?:-(\d+))?(?:.(\d+))?([^\s}]+)(?:\s+(.+?))?)?(?<!\})\}(?!\})/';
-    protected $rexIdx = 1;
-    protected $rexEmptyVal = 2;
-    protected $rexWidth = 3;
-    protected $rexMaxWidth = 4;
-    protected $rexPrecision = 5;
-    protected $rexFormat = 6;
-    protected $rexFormatArgs = 7;
+class BaseFormatter extends AbstractFormatter {
 
     public function format($format/*, $args...*/) {
         $args = func_get_args();
         array_shift($args);
-        return $this->formatArr($format, $args);
+        return $this->formatData($format, $args);
     }
 
     /**
@@ -49,122 +17,7 @@ class BaseFormatter {
      * @return mixed|string
      */
     public function formatArr($format, array $args = []) {
-        if ($format instanceof CompiledFormat) {
-            $formatedArgs = [];
-            foreach ($format->tags as $tag) {
-                $value = $args[$tag->argIndex];
-                if (null !== $tag->argSubIndex) $value = $value[$tag->argSubIndex];
-
-                if (null !== $tag->emptyValue && empty($value)) {
-                    $value = $tag->emptyValue;
-                } else {
-                    $value = $this->formatValue($value, $tag->format, $tag->precision, $tag->formatArgs);
-                }
-                $formatedArgs[] = $value;
-            }
-            return vsprintf($format->string, $formatedArgs);
-        }
-
-        $formatted = preg_replace_callback($this->rex, function ($m) use ($args) {
-            $value = null;
-            $argIdx = null;
-            $argSubIdx = null;
-            $this->parseIndex($m[$this->rexIdx], $value, $argIdx, $argSubIdx);
-            if ($argIdx !== null) $value = $args[$argIdx];
-            if ($argSubIdx !== null) $value = $value[$argSubIdx];
-
-            if (empty($value) && isset($m[$this->rexEmptyVal]) && $m[$this->rexEmptyVal] != '') {
-                $value = $m[$this->rexEmptyVal];
-            } else {
-                $precision = isset($m[$this->rexPrecision]) && $m[$this->rexPrecision] != '' ? $m[$this->rexPrecision] : null;
-                $formatter = isset($m[$this->rexFormat]) && $m[$this->rexFormat] != '' ? $m[$this->rexFormat] : null;
-                $formatArgs = null;
-                if (isset($m[$this->rexFormatArgs]) && $m[$this->rexFormatArgs] != '') {
-                    $formatArgs = array_map('trim', explode(';', $m[$this->rexFormatArgs]));
-                }
-                $value = $this->formatValue($value, $formatter, $precision, $formatArgs);
-            }
-            if (isset($m[$this->rexWidth]) && $m[$this->rexWidth] != '' && $m[$this->rexWidth] !== '0') {
-                $padChar = ' ';
-                $padAlign = STR_PAD_LEFT;
-                $padWidth = $m[$this->rexWidth];
-                
-                if ('-' === $padWidth[0] || '+' === $padWidth[0] || '*' === $padWidth[0]) {
-                    $padAlign = ('-' === $padWidth[0]) ? STR_PAD_RIGHT : ('+' === $padWidth[0] ? STR_PAD_LEFT : STR_PAD_BOTH);
-                    if (isset($padWidth[2]) && ($padWidth[1] <= '0' || $padWidth[1] > '9')) {
-                        $padChar = $padWidth[1];
-                        $padWidth = substr($padWidth, 2);
-                    } else {
-                        $padWidth = substr($padWidth, 1);
-                    }
-                } elseif ('0' === $padWidth[0] && isset($padWidth[1])) {
-                    $padChar = '0';
-                    $padWidth = substr($padWidth, 1);
-                }
-                if ($padWidth > 0) {
-                    $value = str_pad($value, $padWidth, $padChar, $padAlign);
-                }
-            }
-            if (isset($m[$this->rexMaxWidth]) && $m[$this->rexMaxWidth] != '') {
-                if (strlen($value) > $m[$this->rexMaxWidth]) {
-                    $value = substr($value, 0, $m[$this->rexMaxWidth]);
-                }
-            }
-            return $value;
-        }, $format);
-        $formatted = str_replace(['}}', '{{'], ['}', '{'], $formatted);
-
-        return $formatted;
-    }
-
-    public function compile($format) {
-        $compiled = new CompiledFormat();
-        $compiled->string = preg_replace_callback($this->rex, function ($m) use ($compiled) {
-            $idxVal = null;
-            $argIdx = null;
-            $argSubIdx = null;
-            $this->parseIndex($m[$this->rexIdx], $idxVal, $argIdx, $argSubIdx);
-
-            $emptyVal = isset($m[$this->rexEmptyVal]) && $m[$this->rexEmptyVal] != '' ? $m[$this->rexEmptyVal] : '';
-            $width = isset($m[$this->rexWidth]) && $m[$this->rexWidth] != '' ? $m[$this->rexWidth] : '';
-            $precision = isset($m[$this->rexPrecision]) && $m[$this->rexPrecision] != '' ? $m[$this->rexPrecision] : null;
-            $formatter = isset($m[$this->rexFormat]) && $m[$this->rexFormat] != '' ? $m[$this->rexFormat] : null;
-            $formatArgs = null;
-            if (isset($m[$this->rexFormatArgs]) && $m[$this->rexFormatArgs] != '') {
-                $formatArgs = array_map('trim', explode(';', $m[$this->rexFormatArgs]));
-            }
-
-            if ($idxVal !== null && null === $argIdx) {
-                // wartość inline od razu wstawiamy
-                $value = $this->formatValue($idxVal, $formatter, $precision, $formatArgs);
-                if ($width !== null) {
-                    if ('-' === $width[0]) {
-                        $value = str_pad($value, substr($width, 1), ' ', STR_PAD_RIGHT);
-                    } else {
-                        $value = str_pad($value, $width, ' ', STR_PAD_LEFT);
-                    }
-                }
-                return $value;
-            } else {
-                $tag = new CompiledTag();
-                $compiled->tags[] = $tag;
-                $tag->argIndex = $argIdx;
-                $tag->argSubIndex = $argSubIdx;
-                $tag->emptyValue = str_replace(['}}', '{{'], ['}', '{'], $emptyVal);
-                $tag->precision = $precision;
-                $tag->format = $formatter;
-                $tag->formatArgs = $formatArgs;
-                $tag->width = $width;
-                return chr(17) . $width . 's';
-            }
-        }, $format);
-        $compiled->string = str_replace(chr(17), '%', str_replace('%', '%%', $compiled->string));
-        $compiled->string = str_replace(['}}', '{{'], ['}', '{'], $compiled->string);
-        return $compiled;
-    }
-
-    protected function formatValue($value, $formatter, $precision, $formatterArgs) {
-        return $value;
+        return $this->formatData($format, $args);
     }
 
     protected function parseIndex($index, &$value, &$argIndex, &$argSubIndex) {
@@ -205,5 +58,47 @@ class BaseFormatter {
         }
         $value = $index;
         return 1;
+    }
+
+    protected function getDataValue($index, $data, $compiledIndex = null) {
+        if ($compiledIndex !== null) {
+            if (is_array($compiledIndex)) {
+                return $data[$compiledIndex[0]][$compiledIndex[1]];
+            } else {
+                return $data[$compiledIndex];
+            }
+        }
+        $ixVal = null;
+        $ixArgIndex = null;
+        $ixArgSubIndex = null;
+        $this->parseIndex($index, $ixVal, $ixArgIndex, $ixArgSubIndex);
+        if ($ixArgIndex !== null) {
+            $value = $data[$ixArgIndex];
+            if ($ixArgSubIndex !== null) $value = $value[$ixArgSubIndex];
+            return $value;
+        }
+        return $ixVal;
+    }
+
+    protected function getInlineValueFromIndex($index) {
+        if (empty($index)) return null;
+        if ('=' === $index[0]) return substr($index, 1);
+        if ('@' === $index[0] || '.' === $index[0] || ($index[0] >= '0' && $index[0] <= '9')) return null;
+        return $index;
+    }
+
+    protected function compileIndex($index) {
+        $ixVal = null;
+        $ixArgIndex = null;
+        $ixArgSubIndex = null;
+        $this->parseIndex($index, $ixVal, $ixArgIndex, $ixArgSubIndex);
+        if ($ixArgIndex !== null) {
+            if ($ixArgSubIndex !== null) {
+                return [$ixArgIndex, $ixArgSubIndex];
+            } else {
+                return $ixArgIndex;
+            }
+        }
+        return null;
     }
 }

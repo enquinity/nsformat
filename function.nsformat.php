@@ -10,7 +10,7 @@ namespace Nsformat {
         public static function instance() {
             if (null === self::$instance) {
                 if (!class_exists(\Nsformat\StdFormatter::class)) {
-                    require_once __DIR__ . '/general.php';
+                    require_once __DIR__ . '/std.php';
                 }
                 self::$instance = new StdFormatter();
             }
