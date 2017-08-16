@@ -12,6 +12,8 @@ abstract class SqlFormatter extends BaseFormatter {
     protected function formatValue($value, $formatter, $precision, $formatterArgs) {
         if (empty($formatter)) $formatter = 'n';
         switch ($formatter) {
+            case 'raw':
+                return $value;
             case 'n':
                 $as = '';
                 $p = strpos($value, ' AS ');

@@ -19,7 +19,7 @@ class LocaleInfo {
             case 'en-gb':
                 break;
             default:
-                throw new \Exception("Unknown localce code $locale");
+                throw new \Exception("Unknown locale code $locale");
         }
         return $info;
     }
